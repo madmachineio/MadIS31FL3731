@@ -1,9 +1,7 @@
 import SwiftIO
 
 #if canImport(MadDisplay)
-
 import struct MadDisplay.ColorSpace
-
 #endif
 
 public final class MadIS31FL3731 {
@@ -37,22 +35,23 @@ public final class MadIS31FL3731 {
         colorSpace.grayscale = true
 #endif
 
-        reset()
+        shutdown()
         setToPictureMode()
 
         for frame in 0..<8 {
             selectPage(UInt8(frame))
-            clearScreen()
             controlRegInit(true)
             blinkRegInit(true)
+            fill()
         }
-        displayFrame(Int(currentFrame))
+        setToFrame(Int(currentFrame))
+        startup()
     }
 
     public func setToPictureMode(frame: Int? = nil) {
         writeRegister(.configuration, configPicutreMode)
         if let frame = frame {
-            displayFrame(frame)
+            setToFrame(frame)
         }
     }
     
@@ -60,7 +59,7 @@ public final class MadIS31FL3731 {
         writeRegister(.configuration, configAutoPlayMode)
     }
 
-    public func displayFrame(_ frame: Int) {
+    public func setToFrame(_ frame: Int) {
         guard frame < 8 && frame >= 0 else { return }
         currentFrame = UInt8(frame)
         selectPage(currentFrame)
@@ -101,12 +100,6 @@ public final class MadIS31FL3731 {
         i2c.write(data, to: address)
     }
 
-    public func reset() {
-        writeRegister(.shutdown, 0)
-        sleep(ms: 10)
-        writeRegister(.shutdown, 1)
-    }
-
     public func writeBitmap(x: Int, y: Int, width: Int, height: Int, data: [UInt8]) {
         guard x < self.width && y < self.height && width >= 1 && height >= 1 else {
             return
@@ -140,7 +133,7 @@ public final class MadIS31FL3731 {
         }
     }
 
-    public func clearScreen(brightness: UInt8 = 0x00) {
+    public func fill(_ brightness: UInt8 = 0x00) {
         var data = [UInt8](repeating: brightness, count: 144 + 1)
         data[0] = pwmRegOffset
         i2c.write(data, to: address)
@@ -165,7 +158,6 @@ extension MadIS31FL3731 {
         case command            = 0xFD
     }
 
-    @inline(__always)
     private func selectPage(_ page: UInt8) {
         guard page < 8 || page == functionPage else { return }
         let data = [Register.command.rawValue, page]
@@ -221,6 +213,15 @@ extension MadIS31FL3731 {
         data[0] = 0x12
         i2c.write(data, to: address)
     }
+    
+    private func startup() {
+        writeRegister(.shutdown, 1)
+        sleep(ms: 10)
+    }
 
+    private func shutdown() {
+        writeRegister(.shutdown, 0)
+        sleep(ms: 10)
+    }
 
 }
